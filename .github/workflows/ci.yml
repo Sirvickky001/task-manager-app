@@ -11,29 +11,22 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/taskflow
 
 jobs:
-  # ─────────────────────────────────────────────
-  # Job 1: Test
-  # ─────────────────────────────────────────────
-test:
+  test:
     name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: taskflow/package-lock.json 
-
+          cache-dependency-path: taskflow/package-lock.json
       - name: Install dependencies
-        working-directory: taskflow                            
         run: npm ci
-
+        working-directory: taskflow
       - name: Run tests
-        working-directory: taskflow                            
         run: npm run test:ci
-
+        working-directory: taskflow
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
@@ -41,26 +34,22 @@ test:
           path: taskflow/coverage/
           retention-days: 7
 
-  # ─────────────────────────────────────────────
-  # Job 2: Build, scan, push
-  # ─────────────────────────────────────────────
   build-and-push:
     name: Build & Push
     runs-on: ubuntu-latest
-    needs: test                 # only runs if tests pass
+    needs: test
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
-
     permissions:
       contents: read
-      packages: write           # needed to push to GHCR
-
+      packages: write
     outputs:
-      image-tag: ${{ steps.meta.outputs.version }}
-      image-digest: ${{ steps.build.outputs.digest }}
-
+      short-sha: ${{ steps.sha.outputs.short }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -69,59 +58,44 @@ test:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,prefix=sha-,format=short
-            type=ref,event=branch
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-
-      - name: Build Docker image
-        id: build
+      - name: Build image (pre-scan)
         uses: docker/build-push-action@v5
         with:
-          context: .
-          push: false           # build first, scan before pushing
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          load: true            # load into local docker daemon for scanning
+          context: taskflow/
+          push: false
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.sha.outputs.short }}
 
-      - name: Run Trivy vulnerability scan
+      - name: Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.sha.outputs.short }}
           format: table
-          exit-code: '1'        # fail pipeline on CRITICAL
+          exit-code: '1'
           severity: CRITICAL
 
       - name: Push image to GHCR
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: taskflow/
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.sha.outputs.short }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-  # ─────────────────────────────────────────────
-  # Job 3: Update config repo (GitOps handoff)
-  # ─────────────────────────────────────────────
   update-config:
     name: Update config repo
     runs-on: ubuntu-latest
     needs: build-and-push
-
     steps:
       - name: Checkout config repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.repository_owner }}/argocd-main
+          repository: Sirvickky001/argocd-main
           token: ${{ secrets.CONFIG_REPO_PAT }}
           path: config-repo
 
-      - name: Determine environment from branch
+      - name: Set environment
         id: env
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
@@ -130,26 +104,24 @@ test:
             echo "ENV=dev" >> $GITHUB_OUTPUT
           fi
 
-      - name: Update image tag in values file
+      - name: Update image tag
         run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          SHORT_SHA=${{ needs.build-and-push.outputs.short-sha }}
           ENV=${{ steps.env.outputs.ENV }}
-          VALUES_FILE="config-repo/taskflow/${ENV}/values.yaml"
+          FILE="config-repo/taskflow/${ENV}/values.yaml"
 
-          echo "Updating image tag to sha-${SHORT_SHA} in ${VALUES_FILE}"
+          sed -i "s/tag: .*/tag: sha-${SHORT_SHA}/" "${FILE}"
 
-          sed -i "s/tag: .*/tag: sha-${SHORT_SHA}/" "${VALUES_FILE}"
-
-          cat "${VALUES_FILE}"
+          echo "Updated ${FILE}:"
+          cat "${FILE}"
 
       - name: Commit and push
         run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          SHORT_SHA=${{ needs.build-and-push.outputs.short-sha }}
           ENV=${{ steps.env.outputs.ENV }}
-
           cd config-repo
           git config user.email "ci-bot@github.com"
           git config user.name "TaskFlow CI"
           git add taskflow/${ENV}/values.yaml
-          git commit -m "chore(taskflow): update ${ENV} image tag to sha-${SHORT_SHA} [skip ci]"
+          git commit -m "chore(taskflow): update ${ENV} image to sha-${SHORT_SHA} [skip ci]"
           git push
