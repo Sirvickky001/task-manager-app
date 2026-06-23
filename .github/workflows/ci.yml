@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/taskflow
+  IMAGE_NAME: ghcr.io/sirvickky001/taskflow
 
 jobs:
   test:
@@ -16,17 +16,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: taskflow/package-lock.json
+
       - name: Install dependencies
+        working-directory: taskflow
         run: npm ci
-        working-directory: taskflow
+
       - name: Run tests
-        run: npm run test:ci
         working-directory: taskflow
+        run: npm run test:ci
+
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
@@ -64,20 +68,15 @@ jobs:
           context: taskflow/
           push: false
           load: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.sha.outputs.short }}
+          tags: ${{ env.IMAGE_NAME }}:sha-${{ steps.sha.outputs.short }}
 
       - name: Trivy scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.sha.outputs.short }}
+          image-ref: ${{ env.IMAGE_NAME }}:sha-${{ steps.sha.outputs.short }}
           format: table
           exit-code: '1'
           severity: CRITICAL
-      - name: Ensure image name is lowercase
-      run: |
-        echo "IMAGE_NAME=${IMAGE_NAME@L}" >> $GITHUB_ENV
-      env:
-        IMAGE_NAME: ${{ env.IMAGE_NAME }}  
 
       - name: Push image to GHCR
         uses: docker/build-push-action@v5
@@ -85,8 +84,8 @@ jobs:
           context: taskflow/
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.sha.outputs.short }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:sha-${{ steps.sha.outputs.short }}
+            ${{ env.IMAGE_NAME }}:latest
 
   update-config:
     name: Update config repo
@@ -96,7 +95,7 @@ jobs:
       - name: Checkout config repo
         uses: actions/checkout@v4
         with:
-          repository: Sirvickky001/argocd-main
+          repository: Sirvickky001/task-manager-config
           token: ${{ secrets.CONFIG_REPO_PAT }}
           path: config-repo
 
@@ -114,9 +113,7 @@ jobs:
           SHORT_SHA=${{ needs.build-and-push.outputs.short-sha }}
           ENV=${{ steps.env.outputs.ENV }}
           FILE="config-repo/taskflow/${ENV}/values.yaml"
-
           sed -i "s/tag: .*/tag: sha-${SHORT_SHA}/" "${FILE}"
-
           echo "Updated ${FILE}:"
           cat "${FILE}"
 
