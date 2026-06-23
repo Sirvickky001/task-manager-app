@@ -73,6 +73,11 @@ jobs:
           format: table
           exit-code: '1'
           severity: CRITICAL
+      - name: Ensure image name is lowercase
+      run: |
+        echo "IMAGE_NAME=${IMAGE_NAME@L}" >> $GITHUB_ENV
+      env:
+        IMAGE_NAME: ${{ env.IMAGE_NAME }}  
 
       - name: Push image to GHCR
         uses: docker/build-push-action@v5
