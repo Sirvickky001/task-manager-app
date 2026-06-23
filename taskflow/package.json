@@ -1,0 +1,27 @@
+{
+  "name": "taskflow",
+  "version": "1.0.0",
+  "description": "GitOps-deployed task manager — Phase 9 mini project",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "jest --coverage --testPathPattern=src/",
+    "test:ci": "jest --coverage --ci --testPathPattern=src/"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageThreshold": {
+      "global": {
+        "lines": 80
+      }
+    }
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  }
+}

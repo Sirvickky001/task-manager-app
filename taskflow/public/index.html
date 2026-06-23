@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3349;
+      --text: #e8eaf0;
+      --muted: #7b82a0;
+      --accent: #6c63ff;
+      --accent-hover: #7c74ff;
+      --green: #3ecf8e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* Header */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon {
+      width: 30px; height: 30px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .logo-text { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+    .logo-text span { color: var(--accent); }
+    .version-badge {
+      font-size: 11px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      padding: 20px 32px;
+    }
+    .stat {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .stat-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+    .stat-value { font-size: 22px; font-weight: 600; }
+
+    /* Main layout */
+    .main {
+      padding: 0 32px 32px;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    /* Add task panel */
+    .add-panel {
+      width: 320px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      position: sticky;
+      top: 80px;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 16px;
+    }
+    label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+    input[type="text"], select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 14px;
+      appearance: none;
+    }
+    input[type="text"]:focus, select:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+    .add-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 11px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .add-btn:hover { background: var(--accent-hover); }
+    .add-btn:active { transform: scale(0.98); }
+
+    /* Task list */
+    .task-list { flex: 1; min-width: 0; }
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .list-title { font-size: 16px; font-weight: 600; }
+    .filter-tabs { display: flex; gap: 6px; }
+    .filter-tab {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Task card */
+    .task-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: border-color 0.15s;
+      animation: slideIn 0.2s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .task-card:hover { border-color: #3e4460; }
+    .task-card.done { opacity: 0.55; }
+
+    .priority-bar {
+      width: 3px;
+      height: 36px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .priority-high   { background: var(--red); }
+    .priority-medium { background: var(--amber); }
+    .priority-low    { background: var(--blue); }
+
+    .task-info { flex: 1; min-width: 0; }
+    .task-title {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .task-card.done .task-title { text-decoration: line-through; color: var(--muted); }
+    .task-meta { display: flex; align-items: center; gap: 8px; }
+    .task-priority {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .badge-high   { background: rgba(239,68,68,0.15);  color: var(--red); }
+    .badge-medium { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .badge-low    { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .task-date { font-size: 11px; color: var(--muted); }
+
+    /* Status select */
+    .status-select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 110px;
+    }
+
+    /* Delete btn */
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+      line-height: 1;
+    }
+    .delete-btn:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty p { font-size: 14px; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.2s;
+      pointer-events: none;
+      z-index: 100;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: var(--green); }
+    .toast.error   { border-color: var(--red); }
+
+    @media (max-width: 700px) {
+      .main { flex-direction: column; padding: 0 16px 24px; }
+      .add-panel { width: 100%; position: static; }
+      .stats-bar { padding: 16px; flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">✓</div>
+    <div class="logo-text">Task<span>Flow</span></div>
+  </div>
+  <span class="version-badge" id="env-badge">v1.0.0</span>
+</header>
+
+<div class="stats-bar">
+  <div class="stat">
+    <div class="stat-dot" style="background: var(--accent)"></div>
+    <div><div class="stat-label">Total</div><div class="stat-value" id="stat-total">0</div></div>
+  </div>
+  <div class="stat">
+    <div class="stat-dot" style="background: var(--amber)"></div>
+    <div><div class="stat-label">Pending</div><div class="stat-value" id="stat-pending">0</div></div>
+  </div>
+  <div class="stat">
+    <div class="stat-dot" style="background: var(--blue)"></div>
+    <div><div class="stat-label">In progress</div><div class="stat-value" id="stat-inprogress">0</div></div>
+  </div>
+  <div class="stat">
+    <div class="stat-dot" style="background: var(--green)"></div>
+    <div><div class="stat-label">Done</div><div class="stat-value" id="stat-done">0</div></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="add-panel">
+    <div class="panel-title">New task</div>
+    <label>Task title</label>
+    <input type="text" id="task-title" placeholder="e.g. Set up ArgoCD sync..." maxlength="80" />
+    <label>Priority</label>
+    <select id="task-priority">
+      <option value="medium">Medium</option>
+      <option value="high">High</option>
+      <option value="low">Low</option>
+    </select>
+    <button class="add-btn" onclick="addTask()">+ Add task</button>
+  </div>
+
+  <div class="task-list">
+    <div class="list-header">
+      <div class="list-title">Tasks</div>
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="setFilter('all', this)">All</button>
+        <button class="filter-tab" onclick="setFilter('pending', this)">Pending</button>
+        <button class="filter-tab" onclick="setFilter('in-progress', this)">In progress</button>
+        <button class="filter-tab" onclick="setFilter('done', this)">Done</button>
+      </div>
+    </div>
+    <div id="task-container"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let allTasks = [];
+  let currentFilter = 'all';
+
+  async function fetchTasks() {
+    const res = await fetch('/api/tasks');
+    allTasks = await res.json();
+    renderTasks();
+    updateStats();
+  }
+
+  function updateStats() {
+    document.getElementById('stat-total').textContent = allTasks.length;
+    document.getElementById('stat-pending').textContent = allTasks.filter(t => t.status === 'pending').length;
+    document.getElementById('stat-inprogress').textContent = allTasks.filter(t => t.status === 'in-progress').length;
+    document.getElementById('stat-done').textContent = allTasks.filter(t => t.status === 'done').length;
+  }
+
+  function renderTasks() {
+    const container = document.getElementById('task-container');
+    const filtered = currentFilter === 'all'
+      ? allTasks
+      : allTasks.filter(t => t.status === currentFilter);
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div class="empty">
+        <div class="empty-icon">📋</div>
+        <p>No tasks here yet.<br>Add one on the left.</p>
+      </div>`;
+      return;
+    }
+
+    container.innerHTML = filtered.map(task => `
+      <div class="task-card ${task.status === 'done' ? 'done' : ''}" id="card-${task.id}">
+        <div class="priority-bar priority-${task.priority}"></div>
+        <div class="task-info">
+          <div class="task-title">${escHtml(task.title)}</div>
+          <div class="task-meta">
+            <span class="task-priority badge-${task.priority}">${task.priority}</span>
+            <span class="task-date">${formatDate(task.createdAt)}</span>
+          </div>
+        </div>
+        <select class="status-select" onchange="updateStatus(${task.id}, this.value)">
+          <option value="pending"     ${task.status === 'pending'     ? 'selected' : ''}>Pending</option>
+          <option value="in-progress" ${task.status === 'in-progress' ? 'selected' : ''}>In progress</option>
+          <option value="done"        ${task.status === 'done'        ? 'selected' : ''}>Done</option>
+        </select>
+        <button class="delete-btn" onclick="deleteTask(${task.id})" title="Delete task">×</button>
+      </div>
+    `).join('');
+  }
+
+  async function addTask() {
+    const titleEl = document.getElementById('task-title');
+    const priority = document.getElementById('task-priority').value;
+    const title = titleEl.value.trim();
+    if (!title) { showToast('Please enter a task title', 'error'); return; }
+
+    const res = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, priority }),
+    });
+    if (res.ok) {
+      titleEl.value = '';
+      await fetchTasks();
+      showToast('Task added', 'success');
+    }
+  }
+
+  async function updateStatus(id, status) {
+    await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    await fetchTasks();
+  }
+
+  async function deleteTask(id) {
+    await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+    allTasks = allTasks.filter(t => t.id !== id);
+    renderTasks();
+    updateStats();
+    showToast('Task deleted', 'success');
+  }
+
+  function setFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTasks();
+  }
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast show ${type}`;
+    setTimeout(() => t.className = 'toast', 2200);
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Enter key to add
+  document.getElementById('task-title').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTask();
+  });
+
+  fetchTasks();
+</script>
+</body>
+</html>
